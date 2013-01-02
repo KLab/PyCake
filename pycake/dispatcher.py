@@ -7,6 +7,9 @@ from pycake.controller import Controller
 import logging
 logger = logging.getLogger(__name__)
 
+from types import ModuleType
+import importlib
+
 
 class Dispatcher:
     """Scan controllers and dispatch to it.
@@ -22,6 +25,7 @@ class Dispatcher:
 
     def __init__(self):
         self.controllers = {}
+        self.scanned_modules = set()
 
     #noinspection PyBroadException
     def dispatch(self, request):
@@ -47,12 +51,17 @@ class Dispatcher:
             logger.error("Catch uncaught exception")
             return self.internal_server_error_class()
 
-    def scan_module(self, module_name):
-        """Find controller in `module_name` module.
+    def scan_module(self, module):
+        """Find controller in `module`.
+
+        :param module:  module or module name to scan
+        :type module:  str or ModuleType
         """
-        mod = sys.modules[module_name]
-        for name in dir(mod):
-            kls = getattr(mod, name)
+        if isinstance(module, str):
+            module = importlib.import_module(module)
+        module_name = module.__name__
+        for name in dir(module):
+            kls = getattr(module, name)
             if not isinstance(kls, type):
                 continue
             if kls.__module__ is not module_name:  # ignore imported classes.
@@ -68,15 +77,28 @@ class Dispatcher:
                         kls))
             self.controllers[name.lower()] = kls
 
-    def scan_package(self, package_name):
-        """Scan modules in a package `package_name`.
+    def scan_package(self, package):
+        """Scan controller classes from `package` and it's submodules.
 
-        Scanning is done by looking `sys.modules`.
-        You should import modules before using `scan_package`
+        :param package: package to scan
+        :ptype package: str or package
         """
-        for module_name in sys.modules.keys():
-            if module_name.startswith(package_name + '.'):
-                self.scan_module(module_name)
+        if isinstance(package, str):
+            package = importlib.import_module(package)
+        if not isinstance(package, ModuleType):
+            raise ValueError("%s is not a package or module")
+
+        package_name = package.__name__
+        if package_name in self.scanned_modules:
+            return
+        self.scanned_modules.add(package_name)
+
+        self.scan_module(package)
+        for name in dir(package):
+            item = getattr(package, name)
+            if (isinstance(item, ModuleType) and
+                    item.__name__.startswith(package_name)):
+                self.scan_package(item)
 
     def wsgi_app(self, environ, start_response):
         request = webob.Request(environ)
