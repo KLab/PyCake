@@ -109,7 +109,19 @@ class Dispatcher:
     def __call__(self, environ, start_response):
         return self.wsgi_app(environ, start_response)
 
-    def run(self, host='127.0.0.1', port=8888):
+    def run(self, host='127.0.0.1', port=8888, trace=False):
         from wsgiref.simple_server import make_server
+
+        if trace:
+            import trace as tracelib
+            tracer = tracelib.Trace(timing=True,
+                                    ignoremods=('logging', 're', 'sre'),
+                                    )
+            app = self.wsgi_app
+
+            def tracemiddleware(env, start):
+                return tracer.runfunc(app, env, start)
+            self.wsgi_app = tracemiddleware
+
         server = make_server(host, port, self)
         server.serve_forever()
