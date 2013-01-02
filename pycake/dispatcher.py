@@ -40,6 +40,8 @@ class Dispatcher:
             if not controller:
                 return self.notfound_class()
             response = controller.dispatch(request, action_path)
+            if response is None:
+                return self.notfound_class()
             if not callable(response):
                 response = self.response_class(response)
             return response
