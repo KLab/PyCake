@@ -1,4 +1,3 @@
-import sys
 import webob.exc
 
 from . import errors
@@ -107,3 +106,8 @@ class Dispatcher:
 
     def __call__(self, environ, start_response):
         return self.wsgi_app(environ, start_response)
+
+    def run(self, host='127.0.0.1', port=8888):
+        from wsgiref.simple_server import make_server
+        server = make_server(host, port, self)
+        server.serve_forever()
