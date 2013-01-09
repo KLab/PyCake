@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from _controllers import *
 from pycake.dispatcher import Dispatcher
 from webob import Request
 
@@ -8,7 +7,7 @@ from webob import Request
 def test_dispatcher():
     dispatcher = Dispatcher()
     dispatcher.scan_module('_controllers')
-    assert dispatcher.controllers.keys() == {'spam', 'ham'}
+    assert ('GET', '/spam/') in dispatcher.urlmap
 
     request = Request.blank('/spam/')
     response = dispatcher.dispatch(request)

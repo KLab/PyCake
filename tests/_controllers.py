@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from pycake.controller import Controller, GET, POST
+from pycake.controller import BaseController, GET, POST
 
-class Spam(Controller):
+class Spam(BaseController):
+    prefix = '/spam'
+
     @GET
     def index(self):
         return "Hello"
@@ -15,7 +17,7 @@ class Spam(Controller):
     def fizz(self):
         return "buzz"
 
-class Ham(Controller):
+class Ham(BaseController):
     @GET
     def hello(self):
         return "world"

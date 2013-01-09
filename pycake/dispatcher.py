@@ -1,7 +1,6 @@
 import webob.exc
 
-from . import errors
-from pycake.controller import Controller
+from pycake.controller import BaseController
 
 import logging
 logger = logging.getLogger(__name__)
@@ -23,23 +22,20 @@ class Dispatcher:
     response_class = webob.Response
 
     def __init__(self):
-        self.controllers = {}
+        self.urlmap = {}
         self.scanned_modules = set()
 
     #noinspection PyBroadException
     def dispatch(self, request):
+        """Dispatch `request`.
+
+        :type request: webob.Request
+        """
         try:
-            path_info = request.path_info
-            if path_info.count('/') < 2:  # top page
-                controller_name = 'top'
-                action_path = path_info
-            else:
-                _, controller_name, action_path = path_info.split('/', 2)
-                action_path = '/' + action_path
-            controller = self.controllers.get(controller_name)
+            controller = self.urlmap.get((request.method, request.path_info))
             if not controller:
                 return self.notfound_class()
-            response = controller.dispatch(request, action_path)
+            response = controller.dispatch(request)
             if response is None:
                 return self.notfound_class()
             if not callable(response):
@@ -48,7 +44,7 @@ class Dispatcher:
         except webob.exc.HTTPException as e:
             logger.error("Catch HTTP exception")
             return e
-        except Exception as e:
+        except Exception:
             logger.error("Catch uncaught exception")
             return self.internal_server_error_class()
 
@@ -67,22 +63,16 @@ class Dispatcher:
                 continue
             if kls.__module__ is not module_name:  # ignore imported classes.
                 continue
-            if not issubclass(kls, Controller):
+            if not issubclass(kls, BaseController):
                 continue
-            controller_name = name.lower()
-            if controller_name in self.controllers:
-                raise errors.ControllerConflict(
-                    "conflict %r: %r and %r" % (
-                        controller_name,
-                        self.controllers[controller_name],
-                        kls))
-            self.controllers[name.lower()] = kls
+            for method_path in kls.get_methods():
+                self.urlmap[method_path] = kls
 
     def scan_package(self, package):
         """Scan controller classes from `package` and it's submodules.
 
         :param package: package to scan
-        :ptype package: str or package
+        :type package: str or ModuleType
         """
         if isinstance(package, str):
             package = importlib.import_module(package)
